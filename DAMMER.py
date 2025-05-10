@@ -1939,6 +1939,7 @@ def Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemma
     while len(np.unique(connectionarray)) > np.max(np.array([len(triangles)/simplificdegree, nummax])):
      scalerseg = scalerseg*2
      attenuation, connectionarray = clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, systemmat, triang.neighbors, scalerseg, res)
+     
     
     return attenuation, connectionarray, scalerseg 
 
@@ -2374,7 +2375,12 @@ def displacement(vertices, triangles, attenuation, kappaopt, sinogram, angles, n
        areas = [Polygon(np.reshape(vertices, (int(len(vertices)/2), 2))[t]).area for t in triangles]
 
       
-       func0 = optfun(vertices, triangles, edges, angles, numpix, sinogram, atlist, attenuation, trianglesint, scaleredge1, scaleredge2, areaor)
+       if it == 0:
+         func0, projdif0 = optfun(vertices, triangles, edges, angles, numpix, sinogram, atlist, attenuation, trianglesint, scaleredge1, scaleredge2, areaor)
+       else:
+          func0 = func
+          projdif0 = projdif
+       
        inded = 0
 
 
@@ -2413,7 +2419,7 @@ def displacement(vertices, triangles, attenuation, kappaopt, sinogram, angles, n
        areas = [Polygon(np.reshape(vertices, (int(len(vertices)/2), 2))[t]).area for t in triangles]
    
        if np.abs(np.sum(areas) - 1) < 10**(-11):
-         func = optfun(vertices, triangles, edges, angles, numpix, sinogram, atlist, attenuation, trianglesint, scaleredge1, scaleredge2, areaor)
+         func, projdif = optfun(vertices, triangles, edges, angles, numpix, sinogram, atlist, attenuation, trianglesint, scaleredge1, scaleredge2, areaor)
        else:
           func = func0*2
        its = 0
@@ -2426,15 +2432,15 @@ def displacement(vertices, triangles, attenuation, kappaopt, sinogram, angles, n
          its += 1
          if  np.abs(np.sum(areas) - 1) > 10**(-11):
             continue
-         func = optfun(vertices, triangles, edges, angles, numpix, sinogram, atlist, attenuation,  trianglesint, scaleredge1, scaleredge2, areaor)    
-       if np.abs(np.sum(areas) - np.sum(areaor)) > 10**(-11):
+         func, projdif = optfun(vertices, triangles, edges, angles, numpix, sinogram, atlist, attenuation,  trianglesint, scaleredge1, scaleredge2, areaor)    
+       if np.abs(np.sum(areas) - np.sum(areaor)) > 10**(-11) or func > func0:
           vertices = vertices + damp*dx
           vertices = np.reshape(vertices, (int(len(vertices)/2), 2))
+          func = func0 
+          projdif = projdif0
           break
        vertices = np.reshape(vertices, (int(len(vertices)/2), 2))
-       triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)        
-   
-       radss, _ = circumcircle(vertices[triangles])
+
      
      systemmat =  Computesytemmatrix(vertices, triangles, numpix, angles) 
 
@@ -2461,7 +2467,7 @@ def optfun(vertices, triangles, edges, angles, numpix, sinogram, atlist, attenua
   #func = 0.5*np.sum(projdif**2) + 0.5*scaleredge*np.linalg.norm(vertices[edges[:, 0]] - vertices[edges[:, 1]])**2
   #func = 0.5*np.sum(projdif**2) + 0.25*scaleredge*np.linalg.norm(np.vstack((vertices[triangles[:, 0]] - vertices[triangles[:, 1]], \
   #                             vertices[triangles[:, 1]] - vertices[triangles[:, 2]], vertices[triangles[:, 2]] - vertices[triangles[:, 0]])))**2  
-  return func
+  return func, 0.5*np.sum(projdif**2)
 
 
 def gradoptfun(vertices, triangles, edges, angles, numpix, sinogram, atlist, attenuation,  trianglesint, scaleredge1, scaleredge2, areaor):
@@ -2590,12 +2596,12 @@ def asptorch(tet_):
 #%%
 path_to_file = os.getcwd()
 fant = scipy.io.loadmat(f"{path_to_file}/fantoom3_2000x2000.mat")
-N = 31
+N = 31  #Dimension starting mesh, increasing it over sqrt(2)/(2res) +1 didsables first refinement 
 numpix = 1000
 qmax = 2 
 fant1 = fant['fantoom3']
 fant1 = fant1.astype(float)
-res = 0.01
+res = 0.01 #resoltuion parameter
 N_sirtits = 500
 resgr = len(fant1)
 bounds1 = np.array([11.496, 15.465])
@@ -2688,7 +2694,10 @@ for optsteps in range(10):
              trianglesopt = triangles.copy()
              attenuationopt = attenuation.copy()
              projdifbest = projdif
-
+     else :
+             verticesopt = vertices.copy()
+             trianglesopt = triangles.copy()
+             attenuationopt = attenuation.copy()
      vertices, triangles, attenuation = flipandcolclose(vertices, triangles, res, trianglesint, edges, attenuation)
 
      vertices, triangles, attenuation = edgecollapse(vertices, triangles, attenuation, minvar, qmax, 50000, 0, qmax)
@@ -2706,11 +2715,6 @@ for optsteps in range(10):
      attenuation, connectionarray = clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, systemmat, triang.neighbors, scalerseg, res)
 
 
-fig, ax = plt.subplots(figsize=(9,9))
-triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)
-ax.tripcolor(triang, attenuation, cmap='grey')
-plt.axis("off")
-plt.show()
 
 fig, ax = plt.subplots(figsize=(9,9))
 triang = tri.Triangulation(verticesopt[:, 0], verticesopt[:, 1], trianglesopt)
