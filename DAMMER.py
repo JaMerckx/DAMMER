@@ -2436,7 +2436,7 @@ def displacement(vertices, triangles, attenuation, kappaopt, sinogram, angles, n
      areaor = np.array(areas)
      areas = [Polygon(vertices[t]).area for t in triangles]   
 
-     for it in range(12):
+     for it in range(8):
        inded = 0
        for ed in edges:
         normed = np.array([vertices[ed[0]][1] - vertices[ed[1]][1], -(vertices[ed[0]][0] - vertices[ed[1]][0])]) 
