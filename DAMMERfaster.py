@@ -2900,6 +2900,11 @@ for optsteps in range(10):
              verticesopt = vertices.copy()
              trianglesopt = triangles.copy()
              attenuationopt = attenuation.copy()
+
+
+     if it == 9:
+         break    
+    
      vertices, triangles, attenuation = flipandcolclose(vertices, triangles, res, trianglesint, edges, attenuation)
 
      vertices, triangles, attenuation = edgecollapse(vertices, triangles, attenuation, minvar, qmax, 50000, 0, qmax)
@@ -3035,6 +3040,10 @@ for optsteps in range(10):
              verticesopt = vertices.copy()
              trianglesopt = triangles.copy()
              attenuationopt = attenuation.copy()
+
+     if it == 9:
+         break
+    
      vertices, triangles, attenuation = flipandcolclose(vertices, triangles, res, trianglesint, edges, attenuation)
 
      vertices, triangles, attenuation = edgecollapse(vertices, triangles, attenuation, minvar, qmax, 50000, 0, qmax)
