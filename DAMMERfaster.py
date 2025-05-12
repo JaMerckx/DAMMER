@@ -2902,7 +2902,7 @@ for optsteps in range(10):
              attenuationopt = attenuation.copy()
 
 
-     if it == 9:
+     if optsteps == 9:
          break    
     
      vertices, triangles, attenuation = flipandcolclose(vertices, triangles, res, trianglesint, edges, attenuation)
@@ -3041,7 +3041,7 @@ for optsteps in range(10):
              trianglesopt = triangles.copy()
              attenuationopt = attenuation.copy()
 
-     if it == 9:
+     if optsteps == 9:
          break
     
      vertices, triangles, attenuation = flipandcolclose(vertices, triangles, res, trianglesint, edges, attenuation)
