@@ -1988,7 +1988,6 @@ def Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemma
     startvalue = 1
 
     scalerseg = startvalue*projdif0/(2*len(np.where((neighbors).ravel() > -0.5)[0]))
-    scalerseg = scalerseg/2
     simplificdegree = 10
     nummax = 100
     attenuationor = attenuation.copy()
