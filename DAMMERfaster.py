@@ -2010,6 +2010,7 @@ def Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemma
      trianglist[:, 0] = np.where((neighbors) > -0.5)[0]
      trianglist[:, 1] = neighbors[np.where((neighbors) > -0.5)]
      trianglist = trianglist.astype(int)
+     attenuation = attenuationor.copy()
      gradoveredges = np.abs(attenuation[trianglist[:,0]] - \
                     attenuation[trianglist[:, 1]])
      projdif0ns = systemmat@attenuation - sinogram  
@@ -2018,7 +2019,6 @@ def Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemma
      funpos0 = projdif0 + scalerseg*lengrad
      simplificdegree = 10
      nummax = 100
-     attenuation = attenuationor.copy()
      maxgrad = np.max(gradoveredges) 
      gradorder = np.argsort(gradoveredges)
      compared = np.zeros((2, 2))
