@@ -2084,17 +2084,15 @@ def Startingclusterfunctionf(attenuation, vertices, triangles, sinogram, systemm
     nummax = 100
     attenuationor = attenuation.copy()
     connectionarray = np.arange(len(triangles))
+    fistseg = 0
+    con_dict = {}
+    for c in range(len(triangles)):
+         con_dict[c] = [c]
     while len(np.unique(connectionarray)) > np.max(np.array([len(triangles)/simplificdegree, nummax])):
      scalerseg = scalerseg*2
-
-
-     connectionarray = np.arange(len(triangles))
      projdif0 = np.sum((sinogram - systemmat@attenuation)**2)
      numangles = int(len(sinogram)/numpix)
-     startvalue = 1
-     con_dict = {}
-     for c in range(len(triangles)):
-         con_dict[c] = [c]
+
 
      areas = [Polygon(vertices[t]).area for t in triangles]
      areas = np.array(areas)
@@ -2102,13 +2100,15 @@ def Startingclusterfunctionf(attenuation, vertices, triangles, sinogram, systemm
      trianglist[:, 0] = np.where((neighbors) > -0.5)[0]
      trianglist[:, 1] = neighbors[np.where((neighbors) > -0.5)]
      trianglist = trianglist.astype(int)
-     attenuation = attenuationor.copy()
+     #attenuation = attenuationor.copy()
      gradoveredges = np.abs(attenuation[trianglist[:,0]] - \
                     attenuation[trianglist[:, 1]])
      projdif0ns = systemmat@attenuation - sinogram  
 
-     lengrad = len(gradoveredges)/2
-     funpos0 = projdif0 + scalerseg*lengrad
+     if fistseg  == 0:
+      lengrad = len(gradoveredges)/2
+      funpos0 = projdif0 + scalerseg*lengrad
+     firstseg = 1
      simplificdegree = 10
      nummax = 100
      maxgrad = np.max(gradoveredges) 
@@ -2881,150 +2881,6 @@ def asptorch(tet_):
   return torch.max(aspect)
 
 
-#%%
-#No noise
-path_to_file = os.getcwd()
-fant = scipy.io.loadmat(f"{path_to_file}/fantoom3_2000x2000.mat")
-N = 31  #Dimension starting mesh, increasing it over sqrt(2)/(2res) +1 didsables first refinement 
-numpix = 1000
-qmax = 2 
-fant1 = fant['fantoom3']
-fant1 = fant1.astype(float)
-res = 0.01 #resoltuion parameter
-N_sirtits = 500
-resgr = len(fant1)
-bounds1 = np.array([11.496, 15.465])
-bounds2 = np.array([1.29, 1.411])  
-fant = fant1.copy()
-savebest = True
-numangles = 150
-angles = np.linspace(0,2*np.pi,numangles,False) 
-minvar = 0.001**2
-kappaopt = 1
-kappaseg = 1
-fant1[np.where(fant1 == 128)] = 0.5 
-fant1[np.where(fant1 == 64)] = 0.5
-fant1[np.where(fant1 == 255)] = 1
-
-fant1[np.where(fant1 == 128)] = 0.5 
-fant1[np.where(fant1 == 64)] = 0.5
-fant1[np.where(fant1 == 255)] = 1
-
-vol_geom = astra.create_vol_geom(resgr, resgr)
-proj_geom = astra.create_proj_geom('parallel', len(fant1)/numpix, numpix, angles - np.pi/2)
-proj_id = astra.create_projector('cuda',proj_geom,vol_geom)
-sinogram_id, sinogram = astra.create_sino(fant1, proj_id)
-   
-sinogram = sinogram/len(fant1)
-sinogram = sinogram.ravel()
-#sinogram = sinogram + np.random.normal(0, 0.01*np.max(sinogram), len(sinogram))
-#sinogram[np.where(sinogram < 0)] = 0
-del fant1
-noise = 0.01*np.max(sinogram)
-idx = np.indices((N, N))  
-X = idx[1] / (N - 1) 
-Y = idx[0] / (N - 1)  
-X = X.ravel()
-Y = Y.ravel()
-vertices = np.column_stack((X,  Y))
-triangles = []
-for i in range(N - 1):
-  for j in range(N - 1):
-      p1 = i * N + j
-      p2 = p1 + 1
-      p3 = p1 + N
-      p4 = p3 + 1
-      triangles.append([p1, p2, p3])  # Lower triangle
-      triangles.append([p4, p3, p2])  # Upper triangle
-
-triangles = np.array(triangles)
-  
-systemmat =  Computesytemmatrix(vertices, triangles, numpix, angles) 
-  
-
-attenuation, stop1, _ = Sirtrec(systemmat, np.zeros(len(triangles)), N_sirtits, sinogram, 0, 0)
-
-
-
-vertices, triangles, attenuation = Refinement(vertices, triangles, attenuation, noise, res, systemmat, 50000, stop1, True)
-
-
-vertices, triangles, attenuation = edgecollapse(vertices, triangles, attenuation, minvar, qmax, 50000, 1, np.sqrt(2)/2)
-  
-systemmat =  Computesytemmatrix(vertices, triangles, numpix, angles) 
-
-triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)        
-
-
-_, _, scalerseg = Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemmat, triang.neighbors)
-
-scalerseg = scalerseg*kappaseg
-
-attenuation, connectionarray = clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, systemmat, triang.neighbors, scalerseg, res)
-
-if savebest: 
-  verticesopt = vertices.copy()
-  trianglesopt = triangles.copy()
-  attenuationopt = attenuation.copy()
-
-for optsteps in range(10):
-
-     edges, trianglesint, atlist, normals = getinterfaces(vertices, triangles, attenuation)
-
-
-     vertices, projdif, objfun = displacement(vertices, triangles, attenuation, kappaopt, sinogram, angles, numpix, edges, trianglesint, atlist, normals, res)
-   
-
-     if savebest: 
-        if optsteps == 0:
-          verticesopt = vertices.copy()
-          trianglesopt = triangles.copy()
-          attenuationopt = attenuation.copy()
-          projdifbest = projdif
-        else: 
-           if projdif < projdifbest: 
-             verticesopt = vertices.copy()
-             trianglesopt = triangles.copy()
-             attenuationopt = attenuation.copy()
-             projdifbest = projdif
-     else :
-             verticesopt = vertices.copy()
-             trianglesopt = triangles.copy()
-             attenuationopt = attenuation.copy()
-     
-     if optsteps == 9:
-         break        
-     
-     vertices, triangles, attenuation = flipandcolclose(vertices, triangles, res, trianglesint, edges, attenuation)
-
-     vertices, triangles, attenuation = edgecollapse(vertices, triangles, attenuation, minvar, qmax, 50000, 0, qmax)
-
-
-     vertices, triangles, attenuation = Refinement(vertices, triangles, attenuation, noise, res, systemmat, 50000, stop1, False)
-
-     systemmat = Computesytemmatrix(vertices, triangles, numpix, angles) 
-
-
-     attenuation, stop1, projdif = Sirtrec(systemmat, attenuation, N_sirtits, sinogram, 0, 0)
-
-     triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)        
-
-     attenuation, connectionarray = clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, systemmat, triang.neighbors, scalerseg, res)
-
-
-
-fig, ax = plt.subplots(figsize=(9,9))
-triang = tri.Triangulation(verticesopt[:, 0], verticesopt[:, 1], trianglesopt)
-ax.tripcolor(triang, attenuationopt, cmap='grey')
-plt.axis("off")
-plt.show()
-
-fig, ax = plt.subplots(figsize=(9,9))
-triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)
-ax.tripcolor(triang, attenuation, cmap='grey')
-plt.axis("off")
-plt.show()
-
 # %%
 #With noise
 path_to_file = os.getcwd()
@@ -3100,7 +2956,7 @@ systemmat =  Computesytemmatrix(vertices, triangles, numpix, angles)
 triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)        
 
 
-_, _, scalerseg = Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemmat, triang.neighbors)
+_, _, scalerseg = Startingclusterfunctionf(attenuation, vertices, triangles, sinogram, systemmat, triang.neighbors)
 
 scalerseg = scalerseg*kappaseg
 
@@ -3169,5 +3025,151 @@ triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)
 ax.tripcolor(triang, attenuation, cmap='grey')
 plt.axis("off")
 plt.show()
+
+
+#%%
+#No noise
+path_to_file = os.getcwd()
+fant = scipy.io.loadmat(f"{path_to_file}/fantoom3_2000x2000.mat")
+N = 31  #Dimension starting mesh, increasing it over sqrt(2)/(2res) +1 didsables first refinement 
+numpix = 1000
+qmax = 2 
+fant1 = fant['fantoom3']
+fant1 = fant1.astype(float)
+res = 0.01 #resoltuion parameter
+N_sirtits = 500
+resgr = len(fant1)
+bounds1 = np.array([11.496, 15.465])
+bounds2 = np.array([1.29, 1.411])  
+fant = fant1.copy()
+savebest = True
+numangles = 150
+angles = np.linspace(0,2*np.pi,numangles,False) 
+minvar = 0.001**2
+kappaopt = 1
+kappaseg = 1
+fant1[np.where(fant1 == 128)] = 0.5 
+fant1[np.where(fant1 == 64)] = 0.5
+fant1[np.where(fant1 == 255)] = 1
+
+fant1[np.where(fant1 == 128)] = 0.5 
+fant1[np.where(fant1 == 64)] = 0.5
+fant1[np.where(fant1 == 255)] = 1
+
+vol_geom = astra.create_vol_geom(resgr, resgr)
+proj_geom = astra.create_proj_geom('parallel', len(fant1)/numpix, numpix, angles - np.pi/2)
+proj_id = astra.create_projector('cuda',proj_geom,vol_geom)
+sinogram_id, sinogram = astra.create_sino(fant1, proj_id)
+   
+sinogram = sinogram/len(fant1)
+sinogram = sinogram.ravel()
+#sinogram = sinogram + np.random.normal(0, 0.01*np.max(sinogram), len(sinogram))
+#sinogram[np.where(sinogram < 0)] = 0
+del fant1
+noise = 0.01*np.max(sinogram)
+idx = np.indices((N, N))  
+X = idx[1] / (N - 1) 
+Y = idx[0] / (N - 1)  
+X = X.ravel()
+Y = Y.ravel()
+vertices = np.column_stack((X,  Y))
+triangles = []
+for i in range(N - 1):
+  for j in range(N - 1):
+      p1 = i * N + j
+      p2 = p1 + 1
+      p3 = p1 + N
+      p4 = p3 + 1
+      triangles.append([p1, p2, p3])  # Lower triangle
+      triangles.append([p4, p3, p2])  # Upper triangle
+
+triangles = np.array(triangles)
+  
+systemmat =  Computesytemmatrix(vertices, triangles, numpix, angles) 
+  
+
+attenuation, stop1, _ = Sirtrec(systemmat, np.zeros(len(triangles)), N_sirtits, sinogram, 0, 0)
+
+
+
+vertices, triangles, attenuation = Refinement(vertices, triangles, attenuation, noise, res, systemmat, 50000, stop1, True)
+
+
+vertices, triangles, attenuation = edgecollapse(vertices, triangles, attenuation, minvar, qmax, 50000, 1, np.sqrt(2)/2)
+  
+systemmat =  Computesytemmatrix(vertices, triangles, numpix, angles) 
+
+triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)        
+
+
+_, _, scalerseg = Startingclusterfunctionf(attenuation, vertices, triangles, sinogram, systemmat, triang.neighbors)
+
+scalerseg = scalerseg*kappaseg
+
+attenuation, connectionarray = clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, systemmat, triang.neighbors, scalerseg, res)
+
+if savebest: 
+  verticesopt = vertices.copy()
+  trianglesopt = triangles.copy()
+  attenuationopt = attenuation.copy()
+
+for optsteps in range(10):
+
+     edges, trianglesint, atlist, normals = getinterfaces(vertices, triangles, attenuation)
+
+
+     vertices, projdif, objfun = displacement(vertices, triangles, attenuation, kappaopt, sinogram, angles, numpix, edges, trianglesint, atlist, normals, res)
+   
+
+     if savebest: 
+        if optsteps == 0:
+          verticesopt = vertices.copy()
+          trianglesopt = triangles.copy()
+          attenuationopt = attenuation.copy()
+          projdifbest = projdif
+        else: 
+           if projdif < projdifbest: 
+             verticesopt = vertices.copy()
+             trianglesopt = triangles.copy()
+             attenuationopt = attenuation.copy()
+             projdifbest = projdif
+     else :
+             verticesopt = vertices.copy()
+             trianglesopt = triangles.copy()
+             attenuationopt = attenuation.copy()
+     
+     if optsteps == 9:
+         break        
+     
+     vertices, triangles, attenuation = flipandcolclose(vertices, triangles, res, trianglesint, edges, attenuation)
+
+     vertices, triangles, attenuation = edgecollapse(vertices, triangles, attenuation, minvar, qmax, 50000, 0, qmax)
+
+
+     vertices, triangles, attenuation = Refinement(vertices, triangles, attenuation, noise, res, systemmat, 50000, stop1, False)
+
+     systemmat = Computesytemmatrix(vertices, triangles, numpix, angles) 
+
+
+     attenuation, stop1, projdif = Sirtrec(systemmat, attenuation, N_sirtits, sinogram, 0, 0)
+
+     triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)        
+
+     attenuation, connectionarray = clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, systemmat, triang.neighbors, scalerseg, res)
+
+
+
+fig, ax = plt.subplots(figsize=(9,9))
+triang = tri.Triangulation(verticesopt[:, 0], verticesopt[:, 1], trianglesopt)
+ax.tripcolor(triang, attenuationopt, cmap='grey')
+plt.axis("off")
+plt.show()
+
+fig, ax = plt.subplots(figsize=(9,9))
+triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)
+ax.tripcolor(triang, attenuation, cmap='grey')
+plt.axis("off")
+plt.show()
+
 
 # %%
