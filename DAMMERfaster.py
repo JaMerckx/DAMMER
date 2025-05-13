@@ -381,8 +381,8 @@ def  clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, system
        tmin = np.min(connectionarray[np.array([triangle1, triangle2])])
        tmax = np.max(connectionarray[np.array([triangle1, triangle2])])
        radss, _ = circumcircle(vertices[triangles[np.array([triangle1, triangle2])]])
-       if (radss[0] > res or len(con_dict[connectionarray[triangle1]]) > 3 or len(np.setdiff1d(np.unique(connectionarray[neighbors[triangle1]]), connectionarray[triangle1])) < 2) \
-         and (radss[1] > res or len(con_dict[connectionarray[triangle2]]) > 3 or len(np.setdiff1d(np.unique(connectionarray[neighbors[triangle2]]), connectionarray[triangle2])) < 2):
+       if (radss[0] > res or len(con_dict[connectionarray[triangle1]]) > 4 or len(np.setdiff1d(np.unique(connectionarray[neighbors[triangle1]]), connectionarray[triangle1])) < 2) \
+         and (radss[1] > res or len(con_dict[connectionarray[triangle2]]) > 4 or len(np.setdiff1d(np.unique(connectionarray[neighbors[triangle2]]), connectionarray[triangle2])) < 2):
          con1 = con_dict[connectionarray[triangle1]]
          con2 = con_dict[connectionarray[triangle2]]
          if len(con1) > 10 and len(con2) > 10:
