@@ -882,7 +882,7 @@ def refinetrianglefasterns(triang, triangles, vertices, attenuation, splitnu,  r
              aroundsplit = np.unique(aroundsplit[aroundsplit > -0.5])
            aroundsplit0 = aroundsplit.copy()
            aroundsplit2 = np.hstack((triang.neighbors[splitnu], splitnu))
-           aroundsplit2 = np.unique(aroundsplit2[aroundsplit > -0.5])
+           aroundsplit2 = np.unique(aroundsplit2[aroundsplit2 > -0.5])
            for aind2 in range(neiroundvert):
              aroundsplit2 = triang.neighbors[aroundsplit2]
              aroundsplit2 = np.unique(aroundsplit2[aroundsplit2 > -0.5])
