@@ -313,7 +313,6 @@ def  clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, system
     funpos0 = projdif0 + scalerseg*lengrad
     simplificdegree = 10
     nummax = 100
-    attenuation = attenuation.copy()
     #while len(np.unique(connectionarray)) > np.max(np.array([len(triangles)/simplificdegree, nummax])):
     maxgrad = np.max(gradoveredges) 
     gradorder = np.argsort(gradoveredges)
@@ -485,6 +484,18 @@ def  clusterfunctionf(attenuation, vertices, triangles, numpix, sinogram, system
            con_dict[connectionarray[c]].extend([c])
     
     #del atlist
+
+    posvals = np.unique(connectionarray)
+    systmatcrop = np.zeros((numangles*numpix, len(posvals)))
+    for col in range(len(posvals)):
+       rowsor = np.where(connectionarray == posvals[col])[0]
+       systmatcrop[:, col] = np.array(systemmat[:, rowsor].sum(axis=1)).flatten()
+     #for cons in np.unique(connectionarray):
+    atlist = bbREC(systmatcrop, attenuation[posvals], 200, sinogram)
+    for i in range(len(atlist)):
+        attenuation[np.where(connectionarray == posvals[i])[0]] = atlist[i]
+
+
 
     gradoveredges = np.abs(attenuation[trianglist[:,0]] - \
                     attenuation[trianglist[:, 1]])
@@ -937,7 +948,8 @@ def refinetrianglefasterns(triang, triangles, vertices, attenuation, splitnu,  r
              aroundsplit = np.unique(aroundsplit[aroundsplit > -0.5])
            aroundsplit0 = aroundsplit.copy()
            aroundsplit2 = np.hstack((triang.neighbors[splitnu], splitnu))
-           aroundsplit2 = np.unique(aroundsplit2[aroundsplit > -0.5])
+           aroundsplit2 = aroundsplit2[aroundsplit2 > -0.5]
+           aroundsplit2 = np.unique(aroundsplit2)
            for aind2 in range(neiroundvert):
              aroundsplit2 = triang.neighbors[aroundsplit2]
              aroundsplit2 = np.unique(aroundsplit2[aroundsplit2 > -0.5])
@@ -1982,97 +1994,57 @@ def Refinement(vertices, triangles, attenuation, noise, res, systemmat, maxvert,
 
   return vertices, triangles, attenuation 
 
+
 def Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemmat, neighbors):
+    connectionarray = np.arange(len(triangles))
     projdif0 = np.sum((sinogram - systemmat@attenuation)**2)
 
     startvalue = 1
 
-    scalerseg = 0.5*startvalue*projdif0/(2*len(np.where((neighbors).ravel() > -0.5)[0]))
+    scalerseg = startvalue*projdif0/len(np.where((neighbors).ravel() > -0.5)[0])
+    areas = [Polygon(vertices[t]).area for t in triangles]
+    areas = np.array(areas)
+    trianglist = np.zeros((len(np.where((neighbors) > -0.5)[0]), 2))
+    trianglist[:, 0] = np.where((neighbors) > -0.5)[0]
+    trianglist[:, 1] = neighbors[np.where((neighbors) > -0.5)]
+    trianglist = trianglist.astype(int)
+    gradoveredges = np.abs(attenuation[trianglist[:,0]] - \
+                    attenuation[trianglist[:, 1]])
+    
+    lengrad = len(gradoveredges)/2
+    funpos0 = projdif0 + scalerseg*lengrad
     simplificdegree = 10
     nummax = 100
-    attenuationor = attenuation.copy()
-    connectionarray = np.arange(len(triangles))
+    attenuationseg = attenuation.copy()
     while len(np.unique(connectionarray)) > np.max(np.array([len(triangles)/simplificdegree, nummax])):
-     scalerseg = scalerseg*2
-
-
-     connectionarray = np.arange(len(triangles))
-     projdif0 = np.sum((sinogram - systemmat@attenuation)**2)
-     numangles = int(len(sinogram)/numpix)
-     startvalue = 1
-     con_dict = {}
-     for c in range(len(triangles)):
-         con_dict[c] = [c]
-
-     areas = [Polygon(vertices[t]).area for t in triangles]
-     areas = np.array(areas)
-     trianglist = np.zeros((len(np.where((neighbors) > -0.5)[0]), 2))
-     trianglist[:, 0] = np.where((neighbors) > -0.5)[0]
-     trianglist[:, 1] = neighbors[np.where((neighbors) > -0.5)]
-     trianglist = trianglist.astype(int)
-     attenuation = attenuationor.copy()
-     gradoveredges = np.abs(attenuation[trianglist[:,0]] - \
-                    attenuation[trianglist[:, 1]])
-     projdif0ns = systemmat@attenuation - sinogram  
-
-     lengrad = len(gradoveredges)/2
-     funpos0 = projdif0 + scalerseg*lengrad
-     simplificdegree = 10
-     nummax = 100
-     maxgrad = np.max(gradoveredges) 
-     gradorder = np.argsort(gradoveredges)
-     compared = np.zeros((2, 2))
-     for gind in range(len(gradoveredges)):
-        mingrad = gradorder[gind]#np.argmin(gradoveredges)
+      for _ in range(len(gradoveredges)):
+        mingrad = np.argmin(gradoveredges)
         triangle1 = trianglist[mingrad][0]
         triangle2 = trianglist[mingrad][1]
         if connectionarray[triangle1] == connectionarray[triangle2]:
-           gradoveredges[mingrad] = maxgrad
-           continue
-        tmin = np.min(connectionarray[np.array([triangle1, triangle2])])
-        tmax = np.max(connectionarray[np.array([triangle1, triangle2])])
-        con1 = con_dict[connectionarray[triangle1]]
-        con2 = con_dict[connectionarray[triangle2]]
-        if len(con1) > 10 and len(con2) > 10:
-           if np.abs(attenuation[triangle1] - attenuation[triangle2]) > 0.1:
-               continue
-       
-        wheremin = np.where(compared[:, 0] == tmin)[0]
-        if len(wheremin) > 0:
-           wheremax = np.where(compared[wheremin, 1] == tmax)[0]
-           if len(wheremax) > 0:
-             continue
-        atprev = attenuation[np.hstack((con1, con2))].copy()
-        attenuation[np.hstack((con1, con2))] = np.sum(attenuation[np.hstack((con1, con2))]* \
-                                   areas[np.hstack((con1, con2))])/np.sum(areas[np.hstack((con1, con2))])
-
-        lennext = 0
-        for con in neighbors[con1].ravel():
-          if con in con2:
-              lennext += 1
-            
-
-        projdif0ns = projdif0ns + systemmat[:, np.hstack((con1, con2))]@(attenuation[np.hstack((con1, con2))]- atprev)
-        funpos = np.sum(projdif0ns**2) + scalerseg*(lengrad - lennext)
+            gradoveredges[mingrad] = np.max(gradoveredges) 
+            continue
+        con1 = np.where(connectionarray[np.arange(connectionarray[triangle1], len(connectionarray))] == connectionarray[triangle1])[0] + connectionarray[triangle1]
+        con2 = np.where(connectionarray[np.arange(connectionarray[triangle2], len(connectionarray))] == connectionarray[triangle2])[0] + connectionarray[triangle2]
+        atprev = attenuationseg[np.hstack((con1, con2))].copy()
+        attenuationseg[np.hstack((con1, con2))] = np.sum(attenuationseg[np.hstack((con1, con2))]* \
+                                    areas[np.hstack((con1, con2))])/np.sum(areas[np.hstack((con1, con2))])
+        lennext = len(np.intersect1d(neighbors[con1], con2))
+        funpos = np.sum((sinogram - systemmat@attenuationseg)**2) + scalerseg*(lengrad - lennext)
         if funpos < funpos0:
-           funpos0 = funpos
-           lengrad -= lennext
-           minval = np.min(connectionarray[np.array([triangle1, triangle2])])
-           otherval = np.max(connectionarray[np.array([triangle1, triangle2])])
-           connectionarray[np.hstack((con1, con2))] = minval
-           con_dict[minval].extend(con_dict[otherval]) 
-           del con_dict[otherval]
-           compared = np.zeros((2, 2))
+            funpos0 = funpos
+            lengrad -= lennext
+            connectionarray[np.hstack((con1, con2))] = np.min(connectionarray[np.hstack((con1, con2))])
         else:   
-            projdif0ns = projdif0ns - systemmat[:, np.hstack((con1, con2))]\
-            @(attenuation[np.hstack((con1, con2))]- atprev)
-            attenuation[np.hstack((con1, con2))] = atprev
-            compared = np.vstack((compared, np.array([tmin, tmax])))
-       #gradoveredges[mingrad] = maxgrad
-
-    
-    return attenuation, connectionarray, scalerseg 
-
+            attenuationseg[np.hstack((con1, con2))] = atprev
+        gradoveredges[mingrad] = np.max(gradoveredges) 
+      gradoveredges = np.abs(attenuation[trianglist[:,0]] - \
+                    attenuation[trianglist[:, 1]])
+      scalerseg = 2*scalerseg
+      funpos0 = np.sum((sinogram - systemmat@attenuation)**2) + scalerseg*lengrad
+      #del atlist
+    scalerseg = scalerseg/2
+    return attenuationseg, connectionarray, scalerseg 
 
 def Startingclusterfunctionf(attenuation, vertices, triangles, sinogram, systemmat, neighbors):
     projdif0 = np.sum((sinogram - systemmat@attenuation)**2)
@@ -2956,7 +2928,7 @@ systemmat =  Computesytemmatrix(vertices, triangles, numpix, angles)
 triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)        
 
 
-_, _, scalerseg = Startingclusterfunctionf(attenuation, vertices, triangles, sinogram, systemmat, triang.neighbors)
+_, _, scalerseg = Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemmat, triang.neighbors)
 
 scalerseg = scalerseg*kappaseg
 
@@ -3102,7 +3074,7 @@ systemmat =  Computesytemmatrix(vertices, triangles, numpix, angles)
 triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)        
 
 
-_, _, scalerseg = Startingclusterfunctionf(attenuation, vertices, triangles, sinogram, systemmat, triang.neighbors)
+_, _, scalerseg = Startingclusterfunction(attenuation, vertices, triangles, sinogram, systemmat, triang.neighbors)
 
 scalerseg = scalerseg*kappaseg
 
@@ -3170,6 +3142,7 @@ triang = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)
 ax.tripcolor(triang, attenuation, cmap='grey')
 plt.axis("off")
 plt.show()
+
 
 
 # %%
