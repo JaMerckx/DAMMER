@@ -6,10 +6,17 @@ The newer python file is an improved version of the code in the paper in terms o
 Dependencies:
 
 numpy
+
 Numba
+
 astra (for projecting a sinogram from phantom images)
+
 scipy
+
 triangle
+
 pylops
+
 shapely
+
 torch
